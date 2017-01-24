@@ -40,7 +40,7 @@ smooth.loess.deriv <- function(y, span=0.1){
   ddY <- c(ddY[1], ddY)
   ddY.model <-loess(ddY~x, span=0.1)
   
-  return(c(mymodel$fitted, dY.model$fitted, ddY.model$fitted))
+  return(list("pos"=mymodel$fitted, "vel"=dY.model$fitted, "acc"=ddY.model$fitted))
 }
 
 

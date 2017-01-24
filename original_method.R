@@ -21,6 +21,74 @@ noisy.mc.vel.JW.s1 <- mtarrays[['mc.vel']]
 noisy.mc.acc.JW.s1 <- mtarrays[['mc.acc']]
 
 
+
+# ======== loess ===================
+mag.JW.s1 <- noisy.mag.JW.s1
+for (i in 1:36){
+  sample <- noisy.mag.JW.s1[i,]
+  mag.JW.s1[i,] <- smooth.loess(sample, 0.1)
+  comparePlots(noisy.mag.JW.s1, mag.JW.s1, i)
+}
+
+mc.pos.JW.sw1 <- noisy.mc.pos.JW.s1
+mc.vel.JW.sw1 <- noisy.mc.vel.JW.s1
+mc.acc.JW.sw1 <- noisy.mc.acc.JW.s1
+for (scenario in 1:36){
+  for (dim in 1:3){
+    sample <- noisy.mc.pos.JW.s1[scenario, dim,]
+    plotScenario(noisy.mc.pos.JW.s1, scenario, dim)
+    derivatives <- smooth.loess.deriv(sample)
+    mc.pos.JW.sw1[scenario, dim,] <- derivatives$pos
+    mc.vel.JW.sw1[scenario, dim,] <- derivatives$vel
+    mc.acc.JW.sw1[scenario, dim,] <- derivatives$acc
+    #comparePlots(noisy.mc.pos.JW.s1[,dim,], mc.pos.JW.sw1[, dim,], scenario)
+    plotScenario(mc.vel.JW.s1, i, dims["z"])
+    plot(derivatives$vel, type='l')
+  }
+}
+
+toplot <- mc.acc.JW.sw1
+for (scenario in 1:36){
+  scenario <- 1
+   x <- toplot[scenario, 1,]
+   y <- toplot[scenario, 2,]
+   z <- toplot[scenario, 3,]
+   plot(z, type='l', col='red', ylim=c(-0.02, 0.02))
+   lines(x, col='green')
+   lines(y, col="blue")
+}
+plot(mc.vel.JW.s1[1,3,], type='l')
+
+
+z <- mc.pos.JW.sw1[1,3,]
+x <- mc.pos.JW.sw1[1,1,]
+y <- mc.pos.JW.sw1[1,2,]
+scatterplot3d(x, y, z, highlight.3d=TRUE, col.axis="blue",
+              col.grid="lightblue", main="scatterplot3d - 1", type='l')
+
+plot(y~x, type='l')
+plot(z~y, type='l')
+plot(z~x, type='l')
+
+#calc six features: 36x6 features
+features.all = data.frame(matrix(0, ncol=6, nrow=36,
+                       dimnames=list(c(), c("maxVelXY", "maxVelZ", "maxAcc", "maxAccZ", "mag10", "z10"))))
+#max velocity
+features.all$maxVelXY[1] = max(mc.vel.JW.sw1[1,dims["x"],], mc.vel.JW.sw1[1,dims["y"],])
+#max absolute velocity along Z axis
+
+#max acceleration
+
+#max absolute acceleratio along Z axis
+
+#magnitude in the 10th sample after max acceleration
+
+#z position in the 10th sample after max acceleration
+
+
+
+
+
 #filter magnitude and pos using NN
 mag.JW.s1 <- smooth.nn(noisy.mag.JW.s1)
 for (i in 1:36){
@@ -42,75 +110,3 @@ for (i in 1:36){
 plotScenario(mc.pos.JW.sw1, 1, 1)
 comparePlots(noisy.mc.pos.JW.s1, mc.pos.JW.sw1, 1, dims["x"])
 
-# ======== loess ===================
-mag.JW.s1 <- noisy.mag.JW.s1
-for (i in 1:36){
-  sample <- noisy.mag.JW.s1[i,]
-  mag.JW.s1[i,] <- smooth.loess(sample)
-  comparePlots(noisy.mag.JW.s1, mag.JW.s1, i)
-}
-
-mc.pos.JW.sw1 <- noisy.mc.pos.JW.s1
-for (scenario in 1:36){
-  for (dim in 1:3){
-    sample <- noisy.mc.pos.JW.s1[scenario, dim,]
-    mc.pos.JW.sw1[scenario, dim,] <- smooth.loess(sample)
-    comparePlots(noisy.mc.pos.JW.s1[,dim,], mc.pos.JW.sw1[, dim,], scenario)
-  }
-}
-  
-
-x <- 1:300
-y <- noisy.mc.pos.JW.s1[1,3,]
-m <- loess(y~x, span=0.1)
-h <- h.select(x,y,method="cv")
-dY <- diff(m$fitted)/diff(x)
-dY <- c(dY[1], dY)
-dY.model <-loess(dY~x, span=0.1)
-plot(dY.model$fitted, col="green", type='l', main="vel")
-
-ddY <- diff(dY.model$fitted)/diff(x)
-ddY <- c(ddY[1], ddY)
-ddY.model <-loess(ddY~x, span=0.1)
-plot(ddY.model$fitted, col="green", type='l', main="acc")
-
-m <- locpoly(x, y, bandwidth = h)
-m.prime <- locpoly(x, y, bandwidth = h, drv=2)
-y.pred <- predict(m)
-y.prime <- predict(m, deriv=1)
-
-plot(y, type="l")
-lines(m, col="red")
-plot(noisy.mc.vel.JW.s1[1,1,]~x, type='l')
-plot(m.prime, col="green", type='l')
-lines(m.prime, col="green")
-
-#recalculate vel and acc
-ds <- diff(noisy.mc.pos.JW.s1[1,1,])/diff(x)
-ds <- c(ds[1], ds)
-dt <- rowMeans(embed(x))
-plot(noisy.mc.vel.JW.s1[1,1,]~x, type='l')
-lines(ds~dt, col="red")
-
-temp <- diff(noisy.mc.pos.JW.s1[1,1,])
-temp2 <- diff(x)
-df <- data.frame(t=1:300, s=noisy.mc.pos.JW.s1[1,1,], ds=c(temp[1], temp), dt=c(temp2[1], temp2))
-df[50:100,]
-pl#any var with VIF >5 can be dropped 
-
-library(fields)
-y <- noisy.mc.pos.JW.s1[1,1,]
-m <- loess(y~x, span=0.1)
-m <- smooth.spline(y, x, df = 6.4)
-pred <- predict(m)
-pred2 <- predict(m, x, deriv=1)
-
-plot(x, y, type='l')
-lines(pred, col="red")
-
-y.prime <- diff(y)/diff(x)
-pred.prime <- predict(m, deriv=2)
-plot(y.prime, type='l')
-plot(pred.prime, col="blue")
-
-plot(mc.pos.JW.sw1[1,1,], type="l")
