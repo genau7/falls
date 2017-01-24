@@ -5,21 +5,17 @@
 
 plotScenario <- function(data, scenario, dimension=0){
   if (dimension != 0){
-    plot(data[scenario, dimension,], pch=".", main=toString(scenario))
-    lines(data[scenario, dimension,])}
+    plot(data[scenario, dimension,], type='l', main=toString(scenario))}
   else {
-    plot(data[scenario,], pch=".", main=toString(scenario))
-    lines(data[scenario,])}  
+    plot(data[scenario,], type='l', main=toString(scenario))}
 }
 
 comparePlots <- function(data1, data2, scenario, dimension=0){
   if (dimension != 0){
-    plot(data1[scenario, dimension,], pch=".", main=toString(scenario))
-    lines(data1[scenario, dimension,])
+    plot(data1[scenario, dimension,], type='l', main=toString(scenario))
     lines(data2[scenario, dimension,], col="blue")}
   else {
-    plot(data1[scenario,], pch=".", main=toString(scenario))
-    lines(data1[scenario,])
+    plot(data1[scenario,], type='l', main=toString(scenario))
     lines(data2[scenario,], col="red")}  
 }
 
@@ -30,6 +26,21 @@ smooth.loess <- function(y, span=0.1){
   x <- 1:length(y)
   mymodel <- loess(y~x, span = span)
   return(predict(mymodel))
+}
+
+smooth.loess.deriv <- function(y, span=0.1){
+  x <- 1:length(y)
+  mymodel <- loess(y~x, span=span)
+  
+  dY <- diff(mymodel$fitted)/diff(x)
+  dY <- c(dY[1], dY)
+  dY.model <-loess(dY~x, span=span)
+  
+  ddY <- diff(dY.model$fitted)/diff(x)
+  ddY <- c(ddY[1], ddY)
+  ddY.model <-loess(ddY~x, span=0.1)
+  
+  return(c(mymodel$fitted, dY.model$fitted, ddY.model$fitted))
 }
 
 
@@ -48,3 +59,4 @@ smooth.nn <- function(y){
   result <- apply(result, 1 , identity)
   return(result)
 }
+
