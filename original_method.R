@@ -6,6 +6,10 @@ source("utils.R")
 dims <- c(1,2,3)
 names(dims) <- c("x", "y", "z")
 
+#pkgs <- c('doParallel', 'foreach')
+#lapply(pkgs, require, character.only = T)
+#registerDoParallel(cores = 4)
+
 # ============= functions ==============================
 
 
@@ -139,5 +143,42 @@ plot(results, type=c("g", "o"))
 
 
 # =================== NN classification ========================================================================
-features <- features.all[, c(4,5,6,7)]
+features <- features.all[, c(4,5,6)]
+
+
+#normalize features
+
+scaled <- as.data.frame(scale(features, center = mins, scale = maxs - mins))
+scaled$fall <- features.all$fall
+index <- sample(1:nrow(features),round(0.75*nrow(features)))
+train_ <- scaled[index,]
+test_ <- scaled[-index,]
+
+library(neuralnet)
+n <- names(train_)
+f <- as.formula(paste("fall ~", paste(n[!n %in% "fall"], collapse = " + ")))
+nnet.fit <- nnet(fall~., data=train_, size=20, decay=5e-4, maxit=200)
+(predict(nnet.fit, test_)>0.5)
+
+
+selectedFeatures <- c(4,5,6)
+data <- features.all[, selectedFeatures]
+maxs <- apply(data, 2, max)
+maxs <- sapply(maxs, as.numeric)
+mins <- apply(data, 2, min)
+mins <- sapply(mins, as.numeric)
+scaled <- as.data.frame(scale(data, center = mins, scale = maxs - mins))
+scaled$fall <- features.all$fall
+
+
+loo(data, train_, test_)
+
+# leave one out validation
+for(i in 1:nrow(features)){
+  i <- 1
+  train_ <- scaled[-i,]
+  test_ <- scaled[i,]
+  nnet.fit <- nnet(fall~., data=train_, size=20, decay=5e-4, maxit=200)
+  (predict(nnet.fit, test_)>0.5)
+}
 

@@ -65,3 +65,14 @@ calcDerivative <- function(y){
   dY <- apply(dY, 1 , identity)
   return(cbind(dY[,1], dY))
 }
+
+# ========= Classifier =================================
+
+loo <- function(data, train_, test_){
+  for(i in 1:nrow(data)){
+    train_ <- scaled[-i,]
+    test_ <- scaled[i,]
+    nnet.fit <- nnet(fall~., data=train_, size=20, decay=5e-4, maxit=200, trace=FALSE)
+    print(predict(nnet.fit, test_)>0.5)
+  }
+}
