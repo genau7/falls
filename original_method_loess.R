@@ -21,34 +21,43 @@ noisy.mc.vel.JW.s1 <- mtarrays[['mc.vel']]
 noisy.mc.acc.JW.s1 <- mtarrays[['mc.acc']]
 
 
-#filter magnitude and pos using NN
-mag.JW.s1 <- smooth.nn(noisy.mag.JW.s1)
+
+# ======== loess ===================
+mag.JW.s1 <- noisy.mag.JW.s1
 for (i in 1:36){
-  # plotScenario(mag.JW.s1, i)
+  sample <- noisy.mag.JW.s1[i,]
+  mag.JW.s1[i,] <- smooth.loess(sample, 0.1)
   comparePlots(noisy.mag.JW.s1, mag.JW.s1, i)
 }
-
 
 mc.pos.JW.sw1 <- noisy.mc.pos.JW.s1
 mc.vel.JW.sw1 <- noisy.mc.vel.JW.s1
 mc.acc.JW.sw1 <- noisy.mc.acc.JW.s1
-for (dim in 1:3){
-  mc.pos.JW.sw1[,dim,] <- smooth.nn(noisy.mc.pos.JW.s1[,dim,])
-  mc.vel.JW.sw1[,dim,] <- calcDerivative(mc.pos.JW.sw1[,dim,])
-  mc.acc.JW.sw1[,dim,] <- calcDerivative(mc.vel.JW.sw1[,dim,])
+for (scenario in 1:36){
+  for (dim in 1:3){
+    sample <- noisy.mc.pos.JW.s1[scenario, dim,]
+    plotScenario(noisy.mc.pos.JW.s1, scenario, dim)
+    derivatives <- smooth.loess.deriv(sample)
+    mc.pos.JW.sw1[scenario, dim,] <- derivatives$pos
+    mc.vel.JW.sw1[scenario, dim,] <- derivatives$vel
+    mc.acc.JW.sw1[scenario, dim,] <- derivatives$acc
+    #comparePlots(noisy.mc.pos.JW.s1[,dim,], mc.pos.JW.sw1[, dim,], scenario)
+    plotScenario(mc.vel.JW.sw1, i, dims["z"])
+    plot(derivatives$vel, type='l')
+  }
 }
 
-
-toplot <- mc.vel.JW.sw1
+toplot <- mc.acc.JW.sw1
 for (scenario in 1:36){
   scenario <- 1
-  x <- toplot[scenario, 1,]
-  y <- toplot[scenario, 2,]
-  z <- toplot[scenario, 3,]
-  plot(z, type='l', col='red', ylim=c(-0.2, 0.2))
-  lines(x, col='green')
-  lines(y, col="blue")
+   x <- toplot[scenario, 1,]
+   y <- toplot[scenario, 2,]
+   z <- toplot[scenario, 3,]
+   plot(z, type='l', col='red', ylim=c(-0.02, 0.02))
+   lines(x, col='green')
+   lines(y, col="blue")
 }
+plot(mc.vel.JW.sw1[1,3,], type='l')
 
 
 library(scatterplot3d)
@@ -99,16 +108,10 @@ features.all$fall <- as.factor(features.all$fall)
 library(caret)
 library(mlbench)
 set.seed(7)
-features <- features.all
+correlationMatrix <- cor(features.all[,c(1,2,4,5,6)])
+(highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.5))
 
-# == Remove variables with high absolute correlation
-(correlationMatrix <- cor(features[,-7]))
-highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.75)
-print(colnames(features)[highlyCorrelated])
-features <- features[, -highlyCorrelated]
-
-# == Find the most important feature () using an LVQ model
-
+features <- features.all[, -3]
 # prepare training scheme
 control <- trainControl(method="repeatedcv", number=10, repeats=3)
 # train the model
@@ -121,12 +124,11 @@ print(importance)
 plot(importance)
 
 
-# ==== ????????? ============================================
 
 # define the control using a random forest selection function
 control <- rfeControl(functions=rfFuncs, method="cv", number=10)
 # run the RFE algorithm
-results <- rfe(features[,-6], features$fall, sizes=c(1:5), rfeControl=control)
+results <- rfe(features[,1:5], features[,6], sizes=c(1:3), rfeControl=control)
 # summarize the results
 print(results)
 # list the chosen features
@@ -135,9 +137,30 @@ predictors(results)
 plot(results, type=c("g", "o"))
 
 
-# ==== missing part about choosing mag10????? =============
 
 
-# =================== NN classification ========================================================================
-features <- features.all[, c(4,5,6,7)]
+
+
+
+
+#filter magnitude and pos using NN
+mag.JW.s1 <- smooth.nn(noisy.mag.JW.s1)
+for (i in 1:36){
+  # plotScenario(mag.JW.s1, i)
+  comparePlots(noisy.mag.JW.s1, mag.JW.s1, i)
+}
+
+
+mc.pos.JW.sw1 <- noisy.mc.pos.JW.s1
+for (i in 1:3){
+  mc.pos.JW.sw1[,i,] <- smooth.nn(noisy.mc.pos.JW.s1[,i,])
+}
+
+for (i in 1:36){
+  # plotScenario(noisy.mc.pos.JW.s1, i, dims["x"])
+  comparePlots(noisy.mc.pos.JW.s1, mc.pos.JW.sw1, i, dims["x"])
+}
+
+plotScenario(mc.pos.JW.sw1, 1, 1)
+comparePlots(noisy.mc.pos.JW.s1, mc.pos.JW.sw1, 1, dims["x"])
 

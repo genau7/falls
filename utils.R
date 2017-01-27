@@ -60,3 +60,8 @@ smooth.nn <- function(y){
   return(result)
 }
 
+calcDerivative <- function(y){
+  dY <- apply(y, 1, diff) # / diff(x), but diff(x)=1 so it was ignored
+  dY <- apply(dY, 1 , identity)
+  return(cbind(dY[,1], dY))
+}
