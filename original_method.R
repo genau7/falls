@@ -10,12 +10,6 @@ names(dims) <- c("x", "y", "z")
 #lapply(pkgs, require, character.only = T)
 #registerDoParallel(cores = 4)
 
-# ============= functions ==============================
-
-
-
-# ============== eof functions ========================
-
 #load data from actor JW from sensor s1
 mtarrays <- readMat('../matlab_dane/mc_data_JW_s1.mat', fixNames=TRUE)
 
@@ -32,18 +26,17 @@ for (i in 1:36){
   comparePlots(noisy.mag.JW.s1, mag.JW.s1, i)
 }
 
-
-mc.pos.JW.sw1 <- noisy.mc.pos.JW.s1
-mc.vel.JW.sw1 <- noisy.mc.vel.JW.s1
-mc.acc.JW.sw1 <- noisy.mc.acc.JW.s1
+mc.pos.JW.s1 <- noisy.mc.pos.JW.s1
+mc.vel.JW.s1 <- noisy.mc.vel.JW.s1
+mc.acc.JW.s1 <- noisy.mc.acc.JW.s1
 for (dim in 1:3){
-  mc.pos.JW.sw1[,dim,] <- smooth.nn(noisy.mc.pos.JW.s1[,dim,])
-  mc.vel.JW.sw1[,dim,] <- calcDerivative(mc.pos.JW.sw1[,dim,])
-  mc.acc.JW.sw1[,dim,] <- calcDerivative(mc.vel.JW.sw1[,dim,])
+  mc.pos.JW.s1[,dim,] <- smooth.nn(noisy.mc.pos.JW.s1[,dim,])
+  mc.vel.JW.s1[,dim,] <- calcDerivative(mc.pos.JW.s1[,dim,])
+  mc.acc.JW.s1[,dim,] <- calcDerivative(mc.vel.JW.s1[,dim,])
 }
 
 
-toplot <- mc.vel.JW.sw1
+toplot <- mc.vel.JW.s1
 for (scenario in 1:36){
   scenario <- 1
   x <- toplot[scenario, 1,]
@@ -56,9 +49,9 @@ for (scenario in 1:36){
 
 
 library(scatterplot3d)
-z <- mc.pos.JW.sw1[1,3,]
-x <- mc.pos.JW.sw1[1,1,]
-y <- mc.pos.JW.sw1[1,2,]
+z <- mc.pos.JW.s1[1,3,]
+x <- mc.pos.JW.s1[1,1,]
+y <- mc.pos.JW.s1[1,2,]
 scatterplot3d(x, y, z, highlight.3d=TRUE, col.axis="blue",
               col.grid="lightblue", main="scatterplot3d - 1", type='l')
 
@@ -73,19 +66,19 @@ features.all = data.frame(matrix(0, ncol=7, nrow=36,
 
 for(scenario in 1:36){
   #find index of the biggest absolute acceleration along Z axis
-  (index <- which.max(abs(mc.acc.JW.sw1[scenario, dims["z"],])))
+  (index <- which.max(abs(mc.acc.JW.s1[scenario, dims["z"],])))
   
   #max velocity in XY plane
-  features.all$maxVelXY[scenario] = max(mc.vel.JW.sw1[scenario,dims["x"],], mc.vel.JW.sw1[scenario,dims["y"],])
+  features.all$maxVelXY[scenario] = max(mc.vel.JW.s1[scenario,dims["x"],], mc.vel.JW.s1[scenario,dims["y"],])
   
   #max absolute velocity along Z axis
-  features.all$maxVelZ[scenario] = max(abs(mc.vel.JW.sw1[scenario,dims["z"],]))
+  features.all$maxVelZ[scenario] = max(abs(mc.vel.JW.s1[scenario,dims["z"],]))
   
   #max acceleration in XY plane
-  features.all$maxAccXY[scenario] = max(mc.acc.JW.sw1[scenario, dims["x"],], mc.acc.JW.sw1[scenario, dims["y"],])
+  features.all$maxAccXY[scenario] = max(mc.acc.JW.s1[scenario, dims["x"],], mc.acc.JW.s1[scenario, dims["y"],])
 
   #max absolute acceleration along Z axis
-  features.all$maxAccZ[scenario] = abs(mc.acc.JW.sw1[scenario, dims["z"],index])
+  features.all$maxAccZ[scenario] = abs(mc.acc.JW.s1[scenario, dims["z"],index])
   
   if(index > 200)
     index=200
@@ -94,7 +87,7 @@ for(scenario in 1:36){
   features.all$mag10[scenario] <- mag.JW.s1[scenario, index+10]
   
   #z position in the 10th sample after max z acceleration
-  features.all$z10[scenario] <- mc.pos.JW.sw1[scenario, dims["z"], index+10]
+  features.all$z10[scenario] <- mc.pos.JW.s1[scenario, dims["z"], index+10]
 }
 features.all$fall[1:18] <- 1
 features.all$fall[19:36] <- 0
@@ -153,10 +146,6 @@ scaled$fall <- features.all$fall
 index <- sample(1:nrow(features),round(0.75*nrow(features)))
 train_ <- scaled[index,]
 test_ <- scaled[-index,]
-
-library(neuralnet)
-n <- names(train_)
-f <- as.formula(paste("fall ~", paste(n[!n %in% "fall"], collapse = " + ")))
 nnet.fit <- nnet(fall~., data=train_, size=20, decay=5e-4, maxit=200)
 (predict(nnet.fit, test_)>0.5)
 
@@ -170,15 +159,101 @@ mins <- sapply(mins, as.numeric)
 scaled <- as.data.frame(scale(data, center = mins, scale = maxs - mins))
 scaled$fall <- features.all$fall
 
+library(SDMTools)
+preds <- loo(scaled, train_, test_)
+cm <- confusion.matrix(features.all$fall, preds, threshold = 0.5)
 
-loo(data, train_, test_)
 
-# leave one out validation
-for(i in 1:nrow(features)){
-  i <- 1
-  train_ <- scaled[-i,]
-  test_ <- scaled[i,]
-  nnet.fit <- nnet(fall~., data=train_, size=20, decay=5e-4, maxit=200)
-  (predict(nnet.fit, test_)>0.5)
-}
+c# ============= PCA ================================
+pca <- princomp(features, cor=TRUE)
+summary(pca)
+loadings(pca)
+plot(pca)
+biplot(pca)
+pred <- predict(pca)
+features.pca <- data.frame(matrix(0, ncol=2, nrow=36,
+                                  dimnames=list(c(), c("pc1", "pc2"))))
 
+features.pca$pc1 <- pred[,1]
+features.pca$pc2 <- pred[,2]
+
+# ============ classifier after PCA ================
+
+data <- features.pca
+maxs <- apply(data, 2, max)
+maxs <- sapply(maxs, as.numeric)
+mins <- apply(data, 2, min)
+mins <- sapply(mins, as.numeric)
+scaled <- as.data.frame(scale(data, center = mins, scale = maxs - mins))
+scaled$fall <- features.all$fall
+
+preds <- loo(scaled, train_, test_)
+cm <- confusion.matrix(features.all$fall, preds, threshold = 0.5)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ============== NPCA =========================
+
+library(homals)
+NPCA <- homals(data=data, ndim = 2, active = TRUE, level = "numerical")
+pred <- predict(NPCA)
+library(rgl)
+plot(NPCA)
+biplot(pred)
+plot3dstatic(NPCA)
+plot(NPCA, plot.dim=c(1:2), plot.type="graphplot")
+
+res <- homals(galo, active=c(TRUE, TRUE,TRUE, TRUE, FALSE))
+pr.res <- predict(res)
+pr.res
+
+
+#source("https://bioconductor.org/biocLite.R")
+biocLite("pcaMethods")
+library(pcaMethods)
+Matrix <- as.matrix(scaled[,-4])
+Matrix <- as.matrix(data)
+
+#npca <- pca(data, nPcs=2, method="nlpca", maxSteps=2 * prod(dim(Matrix))) #mean scaled
+lala <- nlpca(Matrix, nPcs = 2, maxSteps = 2 * prod(dim(Matrix)), unitsPerLayer = NULL, 
+      functionsPerLayer = NULL, weightDecay = 0.001, weights = NULL)
+
+(predict(lala, data))
+pred <- fitted(lala, Matrix)
+plot(pred[,1], Matrix[,1])
+slplot(lala)
+
+head(pred)
+head(Matrix)
+
+
+
+data(helix)
+helixNA <- helix
+## not a single complete observation
+helixNA <- t(apply(helix, 1, function(x) { x[sample(1:3, 1)] <- NA; x}))
+## 50 steps is not enough, for good estimation use 1000
+helixNlPca <- pca(helixNA, nPcs=1, method="nlpca", maxSteps=50)
+fittedData <- fitted(helixNlPca, helixNA)
+plot(fittedData[which(is.na(helixNA))], helix[which(is.na(helixNA))])
+## compared to solution by Nipals PCA which cannot extract non-linear patterns
+helixNipPca <- pca(helixNA, nPcs=2)
+fittedData <- fitted(helixNipPca)
+plot(fittedData[which(is.na(helixNA))], helix[which(is.na(helixNA))])

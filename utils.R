@@ -3,6 +3,9 @@
 #       author: Katarzyna Stepek
 # ============================================================
 
+dims <- c(1,2,3)
+names(dims) <- c("x", "y", "z")
+
 plotScenario <- function(data, scenario, dimension=0){
   if (dimension != 0){
     plot(data[scenario, dimension,], type='l', main=toString(scenario))}
@@ -50,8 +53,13 @@ smooth.loess.deriv <- function(y, span=0.1){
 #The NN input is scaled to <0,1> and the output scale10 back to regular scale
 filterScenario <- function(sample){
   x <- seq(1/length(sample), 1, 1/length(sample))
-  nnet.fit <- nnet(sample/max(sample)~x, size=15, linout=TRUE, trace=FALSE)
-  return(predict(nnet.fit)*max(sample))
+
+  biggest <- max(sample)
+  smallest <- min(sample)
+  scaled <- (sample-smallest)/(biggest-smallest)
+  
+  nnet.fit <- nnet(scaled~x, size=20, linout=TRUE, trace=FALSE, maxit=1200)
+  return(predict(nnet.fit)*(biggest-smallest)+smallest)
 }
 
 smooth.nn <- function(y){
@@ -68,11 +76,14 @@ calcDerivative <- function(y){
 
 # ========= Classifier =================================
 
-loo <- function(data, train_, test_){
-  for(i in 1:nrow(data)){
+loo <- function(scaled){
+  sampleSize <- nrow(scaled)
+  preds <- 1:sampleSize
+  for(i in 1:sampleSize){
     train_ <- scaled[-i,]
     test_ <- scaled[i,]
     nnet.fit <- nnet(fall~., data=train_, size=20, decay=5e-4, maxit=200, trace=FALSE)
-    print(predict(nnet.fit, test_)>0.5)
+    preds[i] <- predict(nnet.fit, test_)
   }
+  return(preds)
 }
